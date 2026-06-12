@@ -7,11 +7,10 @@
     "test": "node --test \"test/*.test.js\"",
     "icons": "node scripts/gen-icons.js",
     "certs": "office-addin-dev-certs install",
-    "start": "http-server . -p 3000 -S -C ~/.office-addin-dev-certs/localhost.crt -K ~/.office-addin-dev-certs/localhost.key --cors",
-    "start:http": "http-server . -p 3000 --cors"
+    "start": "node scripts/serve.js",
+    "start:http": "node scripts/serve.js --http"
   },
   "devDependencies": {
-    "http-server": "^14.1.1",
     "office-addin-dev-certs": "^1.13.3"
   },
   "license": "MIT"
