@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>adff02c1-c699-40e1-92a5-11bc9bb47de9</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>SlideCharts</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="SlideCharts" />
+  <Description DefaultValue="think-cell-style charts, agenda slides, smart elements, and layout tools for PowerPoint." />
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://github.com/jspatrick/jp-think-cell" />
+
+  <Hosts>
+    <Host Name="Presentation" />
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/src/taskpane/taskpane.html" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Presentation">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="SlideCharts.Group">
+                <Label resid="SlideCharts.GroupLabel" />
+                <Icon>
+                  <bt:Image size="16" resid="SlideCharts.Icon.16" />
+                  <bt:Image size="32" resid="SlideCharts.Icon.32" />
+                  <bt:Image size="80" resid="SlideCharts.Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="SlideCharts.TaskpaneButton">
+                  <Label resid="SlideCharts.TaskpaneButton.Label" />
+                  <Supertip>
+                    <Title resid="SlideCharts.TaskpaneButton.Label" />
+                    <Description resid="SlideCharts.TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="SlideCharts.Icon.16" />
+                    <bt:Image size="32" resid="SlideCharts.Icon.32" />
+                    <bt:Image size="80" resid="SlideCharts.Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>SlideCharts.Taskpane</TaskpaneId>
+                    <SourceLocation resid="SlideCharts.Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="SlideCharts.Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png" />
+        <bt:Image id="SlideCharts.Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png" />
+        <bt:Image id="SlideCharts.Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="SlideCharts.Taskpane.Url" DefaultValue="https://localhost:3000/src/taskpane/taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="SlideCharts.GroupLabel" DefaultValue="SlideCharts" />
+        <bt:String id="SlideCharts.TaskpaneButton.Label" DefaultValue="SlideCharts" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="SlideCharts.TaskpaneButton.Tooltip" DefaultValue="Open SlideCharts: waterfall, Mekko, Gantt charts, agenda slides, and layout tools." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
