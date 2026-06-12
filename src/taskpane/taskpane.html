@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SlideCharts</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>SlideCharts</h1>
+    <p class="tagline">think-cell-style charts &amp; tools for PowerPoint</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="charts">Charts</button>
+    <button class="tab" data-tab="agenda">Agenda</button>
+    <button class="tab" data-tab="elements">Elements</button>
+    <button class="tab" data-tab="layout">Layout</button>
+  </nav>
+
+  <!-- ============================ CHARTS ============================ -->
+  <section id="panel-charts" class="panel active">
+    <label class="field-label" for="chart-type">Chart type</label>
+    <select id="chart-type">
+      <option value="waterfall">Waterfall</option>
+      <option value="stacked">Stacked column</option>
+      <option value="stacked100">100% stacked column</option>
+      <option value="mekko">Mekko (Marimekko)</option>
+      <option value="gantt">Gantt / timeline</option>
+    </select>
+
+    <label class="field-label" for="chart-data">
+      Data <span class="hint">(paste from Excel — tab, comma, or semicolon separated)</span>
+    </label>
+    <textarea id="chart-data" rows="10" spellcheck="false"
+      placeholder="Label&#9;Value&#10;Start&#9;100&#10;Growth&#9;30&#10;Costs&#9;-20&#10;End&#9;e"></textarea>
+
+    <div class="row">
+      <button id="btn-example" class="secondary">Load example</button>
+      <label class="check"><input type="checkbox" id="opt-labels" checked /> Labels</label>
+      <label class="check"><input type="checkbox" id="opt-totals" checked /> Totals</label>
+    </div>
+
+    <div class="format-hint" id="format-hint"></div>
+
+    <button id="btn-insert-chart" class="primary">Insert chart on current slide</button>
+  </section>
+
+  <!-- ============================ AGENDA ============================ -->
+  <section id="panel-agenda" class="panel">
+    <p class="explain">
+      Scan slide titles to build a table of contents, edit the list,
+      then insert a styled agenda slide (added at the end of the deck —
+      drag it where you need it).
+    </p>
+    <button id="btn-scan-titles" class="secondary">Scan slide titles</button>
+    <label class="field-label" for="agenda-items">Agenda items (one per line)</label>
+    <textarea id="agenda-items" rows="8" spellcheck="false"
+      placeholder="Executive summary&#10;Market overview&#10;Financials&#10;Next steps"></textarea>
+    <label class="field-label" for="agenda-heading">Heading</label>
+    <input type="text" id="agenda-heading" value="Agenda" />
+    <button id="btn-insert-agenda" class="primary">Insert agenda slide</button>
+  </section>
+
+  <!-- =========================== ELEMENTS =========================== -->
+  <section id="panel-elements" class="panel">
+    <h2>Harvey balls</h2>
+    <div class="btn-grid">
+      <button class="glyph" data-harvey="0">○</button>
+      <button class="glyph" data-harvey="25">◔</button>
+      <button class="glyph" data-harvey="50">◑</button>
+      <button class="glyph" data-harvey="75">◕</button>
+      <button class="glyph" data-harvey="100">●</button>
+    </div>
+
+    <h2>Checkboxes</h2>
+    <div class="btn-grid">
+      <button class="glyph" data-check="empty">☐</button>
+      <button class="glyph" data-check="checked">☑</button>
+      <button class="glyph" data-check="crossed">☒</button>
+    </div>
+
+    <h2>Process flow</h2>
+    <input type="text" id="flow-steps" value="Plan, Build, Test, Launch"
+      title="Comma-separated step labels" />
+    <button id="btn-flow" class="secondary">Insert process flow</button>
+
+    <h2>Traffic light</h2>
+    <div class="btn-grid">
+      <button class="pill red" data-light="red">Red</button>
+      <button class="pill amber" data-light="amber">Amber</button>
+      <button class="pill green" data-light="green">Green</button>
+    </div>
+
+    <h2>Stamps</h2>
+    <div class="btn-grid">
+      <button class="pill stamp" data-stamp="DRAFT">DRAFT</button>
+      <button class="pill stamp" data-stamp="CONFIDENTIAL">CONFIDENTIAL</button>
+      <button class="pill stamp" data-stamp="FINAL">FINAL</button>
+    </div>
+  </section>
+
+  <!-- ============================ LAYOUT ============================ -->
+  <section id="panel-layout" class="panel">
+    <p class="explain">Select two or more shapes on the slide, then:</p>
+    <h2>Align</h2>
+    <div class="btn-grid">
+      <button class="tool" data-layout="alignLeft">⇤ Left</button>
+      <button class="tool" data-layout="alignCenterH">↔ Center</button>
+      <button class="tool" data-layout="alignRight">⇥ Right</button>
+      <button class="tool" data-layout="alignTop">⤒ Top</button>
+      <button class="tool" data-layout="alignMiddleV">↕ Middle</button>
+      <button class="tool" data-layout="alignBottom">⤓ Bottom</button>
+    </div>
+    <h2>Distribute (3+ shapes)</h2>
+    <div class="btn-grid">
+      <button class="tool" data-layout="distH">⇿ Horizontally</button>
+      <button class="tool" data-layout="distV">⇳ Vertically</button>
+    </div>
+    <h2>Same size (first selected = reference)</h2>
+    <div class="btn-grid">
+      <button class="tool" data-layout="sameWidth">Same width</button>
+      <button class="tool" data-layout="sameHeight">Same height</button>
+      <button class="tool" data-layout="sameSize">Same size</button>
+    </div>
+  </section>
+
+  <footer>
+    <div id="status" class="status"></div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
