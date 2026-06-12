@@ -2,6 +2,10 @@
 // PowerPoint shapes on the active slide. Charts are inserted as plain
 // shapes (like think-cell's output), so users can recolor or tweak them
 // with normal PowerPoint tools afterwards.
+//
+// Every shape of a chart is tagged via its name with the chart id, which
+// lets updateChart() replace a previously inserted chart in place —
+// mirroring think-cell's datasheet -> slide sync.
 
 /* global PowerPoint, Office */
 
@@ -14,19 +18,47 @@ export function getTargetSlide(context) {
   return context.presentation.slides.getItemAt(0);
 }
 
-export async function insertPrimitives(prims, { namePrefix = "SlideCharts" } = {}) {
+export function newChartId() {
+  return `SC[${Math.random().toString(36).slice(2, 7)}]`;
+}
+
+export async function insertPrimitives(prims, { chartId = newChartId() } = {}) {
   await PowerPoint.run(async (context) => {
     const slide = getTargetSlide(context);
-    const shapes = slide.shapes;
-    let i = 0;
-    for (const p of prims) {
-      i += 1;
-      if (p.kind === "rect") drawRect(shapes, p, `${namePrefix} ${p.meta?.role || "rect"} ${i}`);
-      else if (p.kind === "line") drawLine(shapes, p, `${namePrefix} line ${i}`);
-      else if (p.kind === "text") drawText(shapes, p, `${namePrefix} text ${i}`);
-    }
+    drawAll(slide.shapes, prims, chartId);
     await context.sync();
   });
+  return chartId;
+}
+
+// Replace a previously inserted chart: delete all shapes tagged with the
+// chart id on the current slide, then draw the new primitives.
+export async function updateChart(chartId, prims) {
+  let replaced = false;
+  await PowerPoint.run(async (context) => {
+    const slide = getTargetSlide(context);
+    slide.shapes.load("items/name,items/id");
+    await context.sync();
+
+    const old = slide.shapes.items.filter((s) => s.name.startsWith(chartId));
+    replaced = old.length > 0;
+    old.forEach((s) => s.delete());
+    drawAll(slide.shapes, prims, chartId);
+    await context.sync();
+  });
+  return replaced;
+}
+
+function drawAll(shapes, prims, chartId) {
+  let i = 0;
+  for (const p of prims) {
+    i += 1;
+    const name = `${chartId} ${p.meta?.role || p.kind} ${i}`;
+    if (p.kind === "rect") drawRect(shapes, p, name);
+    else if (p.kind === "line") drawLine(shapes, p, name);
+    else if (p.kind === "text") drawText(shapes, p, name);
+    else if (p.kind === "arrow") drawArrow(shapes, p, name);
+  }
 }
 
 function geometricType(p) {
@@ -52,6 +84,18 @@ function drawRect(shapes, p, name) {
     s.lineFormat.visible = false;
   }
   if (p.text != null && p.text !== "") applyText(s, p, true);
+}
+
+function drawArrow(shapes, p, name) {
+  const type = p.dir === "upDown"
+    ? PowerPoint.GeometricShapeType.upDownArrow
+    : PowerPoint.GeometricShapeType.rightArrow;
+  const s = shapes.addGeometricShape(type, {
+    left: p.x, top: p.y, width: Math.max(p.w, 1), height: Math.max(p.h, 1)
+  });
+  s.name = name;
+  s.fill.setSolidColor(normColor(p.fill || "#404040"));
+  s.lineFormat.visible = false;
 }
 
 function drawLine(shapes, p, name) {

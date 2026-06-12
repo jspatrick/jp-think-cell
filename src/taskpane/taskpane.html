@@ -24,28 +24,49 @@
   <section id="panel-charts" class="panel active">
     <label class="field-label" for="chart-type">Chart type</label>
     <select id="chart-type">
-      <option value="waterfall">Waterfall</option>
       <option value="stacked">Stacked column</option>
       <option value="stacked100">100% stacked column</option>
+      <option value="clustered">Clustered column</option>
+      <option value="waterfall">Waterfall</option>
       <option value="mekko">Mekko (Marimekko)</option>
       <option value="gantt">Gantt / timeline</option>
     </select>
 
-    <label class="field-label" for="chart-data">
-      Data <span class="hint">(paste from Excel — tab, comma, or semicolon separated)</span>
+    <label class="field-label">Preview <span class="hint">(updates live as you type)</span></label>
+    <div id="chart-preview" class="chart-preview"></div>
+
+    <label class="field-label">
+      Datasheet <span class="hint">(paste from Excel; year sequences auto-continue)</span>
     </label>
-    <textarea id="chart-data" rows="10" spellcheck="false"
-      placeholder="Label&#9;Value&#10;Start&#9;100&#10;Growth&#9;30&#10;Costs&#9;-20&#10;End&#9;e"></textarea>
+    <div id="datasheet" class="datasheet-wrap"></div>
 
     <div class="row">
       <button id="btn-example" class="secondary">Load example</button>
+      <button id="btn-clear" class="secondary">Clear</button>
+    </div>
+
+    <div class="row">
       <label class="check"><input type="checkbox" id="opt-labels" checked /> Labels</label>
       <label class="check"><input type="checkbox" id="opt-totals" checked /> Totals</label>
+      <label class="check"><input type="checkbox" id="opt-axis" /> Value axis</label>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="opt-cagr" /> CAGR arrow</label>
+      <label class="check"><input type="checkbox" id="opt-diff" /> Difference arrow</label>
+      <label class="check">Decimals
+        <select id="opt-decimals" class="inline-select">
+          <option value="">Auto</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </label>
     </div>
 
     <div class="format-hint" id="format-hint"></div>
 
     <button id="btn-insert-chart" class="primary">Insert chart on current slide</button>
+    <button id="btn-insert-new" class="secondary full" hidden>Insert as new chart</button>
   </section>
 
   <!-- ============================ AGENDA ============================ -->

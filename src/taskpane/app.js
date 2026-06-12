@@ -2,9 +2,13 @@
 
 /* global Office */
 
-import { parseTable, toWaterfall, toMatrix, toGantt } from "../lib/parse.js";
-import { layoutWaterfall, layoutStacked, layoutMekko, layoutGantt } from "../lib/chartmath.js";
-import { insertPrimitives } from "../office/render.js";
+import { toWaterfall, toMatrix, toGantt } from "../lib/parse.js";
+import {
+  layoutWaterfall, layoutStacked, layoutClustered, layoutMekko, layoutGantt
+} from "../lib/chartmath.js";
+import { primsToSvg } from "../lib/svgpreview.js";
+import { insertPrimitives, updateChart, newChartId } from "../office/render.js";
+import { createGrid } from "./grid.js";
 import { readSlideTitles, insertAgendaSlide } from "../office/agenda.js";
 import {
   insertHarveyBall, insertCheckbox, insertProcessFlow,
@@ -14,27 +18,44 @@ import { applyLayout } from "../office/layout.js";
 
 // Default chart frame on a 16:9 slide (960x540pt), leaving room for a title.
 const CHART_FRAME = { x: 120, y: 110, w: 720, h: 360 };
+const PREVIEW_BOX = { x: 100, y: 95, w: 760, h: 390 };
 
 const EXAMPLES = {
-  waterfall:
-    "Label\tValue\n2024 Revenue\t820\nVolume\t95\nPrice\t40\nChurn\t-60\nFX\t-25\n2025 Revenue\te",
-  stacked:
-    "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85",
-  stacked100:
-    "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85",
-  mekko:
-    "\tSegment A\tSegment B\tSegment C\nUs\t40\t25\t10\nComp 1\t30\t45\t15\nComp 2\t30\t30\t75",
-  gantt:
-    "Task\tStart\tEnd\nDiscovery\t1\t3\nDesign\t2\t5\nBuild\t4\t10\nTest\t9\t12\nLaunch\t12\t12"
+  waterfall: [
+    ["Label", "Value"],
+    ["2024 Revenue", "820"], ["Volume", "95"], ["Price", "40"],
+    ["Churn", "-60"], ["FX", "-25"], ["2025 Revenue", "e"]
+  ],
+  stacked: [
+    ["", "2022", "2023", "2024", "2025"],
+    ["Americas", "120", "135", "150", "170"],
+    ["EMEA", "90", "95", "100", "110"],
+    ["APAC", "45", "55", "70", "85"]
+  ],
+  mekko: [
+    ["", "Segment A", "Segment B", "Segment C"],
+    ["Us", "40", "25", "10"],
+    ["Comp 1", "30", "45", "15"],
+    ["Comp 2", "30", "30", "75"]
+  ],
+  gantt: [
+    ["Task", "Start", "End"],
+    ["Discovery", "1", "3"], ["Design", "2", "5"],
+    ["Build", "4", "10"], ["Test", "9", "12"], ["Launch", "12", "12"]
+  ]
 };
+EXAMPLES.stacked100 = EXAMPLES.stacked;
+EXAMPLES.clustered = EXAMPLES.stacked;
 
 const FORMAT_HINTS = {
   waterfall:
     'Two columns: label, value. Use "e" (or "total"/"=") in the value column for a computed subtotal/total bar.',
   stacked:
-    "Matrix: first row = categories (leave the corner cell empty), each following row = series name + values.",
+    "Matrix: first row = categories (leave the corner cell empty), each following row = series name + values. Totals are computed for you.",
   stacked100:
-    "Matrix: first row = categories, each following row = series name + values. Columns are normalized to 100%.",
+    "Matrix: first row = categories, rows = series. Columns are normalized to 100%.",
+  clustered:
+    "Matrix: first row = categories, rows = series. Bars are drawn side by side.",
   mekko:
     "Matrix: first row = categories, rows = series. Column width is proportional to the column total.",
   gantt:
@@ -42,6 +63,8 @@ const FORMAT_HINTS = {
 };
 
 const $ = (id) => document.getElementById(id);
+let grid;
+let currentChartId = null; // last chart inserted this session -> Update mode
 
 Office.onReady((info) => {
   if (info.host && info.host !== Office.HostType.PowerPoint) {
@@ -52,7 +75,6 @@ Office.onReady((info) => {
   wireAgenda();
   wireElements();
   wireLayout();
-  updateFormatHint();
 });
 
 // ------------------------------------------------------------------ tabs
@@ -72,41 +94,98 @@ function wireTabs() {
 // ----------------------------------------------------------------- charts
 
 function wireCharts() {
-  $("chart-type").addEventListener("change", updateFormatHint);
-  $("btn-example").addEventListener("click", () => {
-    $("chart-data").value = EXAMPLES[$("chart-type").value];
-    setStatus("Example loaded — press Insert.");
+  grid = createGrid($("datasheet"), { onChange: refreshPreview });
+  grid.setData(EXAMPLES.stacked);
+
+  $("chart-type").addEventListener("change", () => {
+    updateFormatHint();
+    resetSync();
+    refreshPreview();
   });
-  $("btn-insert-chart").addEventListener("click", () => run(insertChart, "Chart inserted."));
+  ["opt-labels", "opt-totals", "opt-axis", "opt-cagr", "opt-diff", "opt-decimals"]
+    .forEach((id) => $(id).addEventListener("change", refreshPreview));
+
+  $("btn-example").addEventListener("click", () => {
+    grid.setData(EXAMPLES[$("chart-type").value]);
+    setStatus("Example loaded — edit the datasheet or press Insert.");
+  });
+  $("btn-clear").addEventListener("click", () => {
+    grid.clear();
+    resetSync();
+  });
+
+  $("btn-insert-chart").addEventListener("click", () => run(insertOrUpdate));
+  $("btn-insert-new").addEventListener("click", () => run(() => doInsert(true)));
+
+  updateFormatHint();
+  refreshPreview();
+}
+
+function buildPrims(frame) {
+  const type = $("chart-type").value;
+  const rows = grid.getData();
+  if (!rows.length) throw new Error("The datasheet is empty.");
+  const decRaw = $("opt-decimals").value;
+  const o = {
+    showLabels: $("opt-labels").checked,
+    showTotals: $("opt-totals").checked,
+    axis: $("opt-axis").checked,
+    cagr: $("opt-cagr").checked,
+    diff: $("opt-diff").checked,
+    decimals: decRaw === "" ? undefined : Number(decRaw)
+  };
+  if (type === "waterfall") return layoutWaterfall(toWaterfall(rows), frame, o);
+  if (type === "stacked") return layoutStacked(toMatrix(rows), frame, o);
+  if (type === "stacked100") return layoutStacked(toMatrix(rows), frame, { ...o, percent: true });
+  if (type === "clustered") return layoutClustered(toMatrix(rows), frame, o);
+  if (type === "mekko") return layoutMekko(toMatrix(rows), frame, o);
+  if (type === "gantt") return layoutGantt(toGantt(rows), frame, o);
+  throw new Error(`Unknown chart type: ${type}`);
+}
+
+function refreshPreview() {
+  const el = $("chart-preview");
+  try {
+    const prims = buildPrims(CHART_FRAME);
+    el.innerHTML = primsToSvg(prims, PREVIEW_BOX);
+  } catch (e) {
+    el.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function insertOrUpdate() {
+  if (currentChartId) {
+    const prims = buildPrims(CHART_FRAME);
+    const replaced = await updateChart(currentChartId, prims);
+    setStatus(replaced
+      ? "Chart updated on the slide."
+      : "Previous chart not found on this slide — inserted fresh.");
+  } else {
+    await doInsert(false);
+  }
+}
+
+async function doInsert(asNew) {
+  const prims = buildPrims(CHART_FRAME);
+  currentChartId = newChartId();
+  await insertPrimitives(prims, { chartId: currentChartId });
+  enterSyncMode();
+  setStatus(asNew ? "New chart inserted." : "Chart inserted — edits here now update it in place.");
+}
+
+function enterSyncMode() {
+  $("btn-insert-chart").textContent = "Update chart on slide";
+  $("btn-insert-new").hidden = false;
+}
+
+function resetSync() {
+  currentChartId = null;
+  $("btn-insert-chart").textContent = "Insert chart on current slide";
+  $("btn-insert-new").hidden = true;
 }
 
 function updateFormatHint() {
   $("format-hint").textContent = FORMAT_HINTS[$("chart-type").value];
-}
-
-async function insertChart() {
-  const type = $("chart-type").value;
-  const raw = $("chart-data").value;
-  if (!raw.trim()) throw new Error("Paste some data first (or click Load example).");
-  const rows = parseTable(raw);
-  const showLabels = $("opt-labels").checked;
-  const showTotals = $("opt-totals").checked;
-
-  let prims;
-  if (type === "waterfall") {
-    prims = layoutWaterfall(toWaterfall(rows), CHART_FRAME, { showLabels });
-  } else if (type === "stacked" || type === "stacked100") {
-    prims = layoutStacked(toMatrix(rows), CHART_FRAME, {
-      percent: type === "stacked100", showLabels, showTotals
-    });
-  } else if (type === "mekko") {
-    prims = layoutMekko(toMatrix(rows), CHART_FRAME, { showLabels, showTotals });
-  } else if (type === "gantt") {
-    prims = layoutGantt(toGantt(rows), CHART_FRAME);
-  } else {
-    throw new Error(`Unknown chart type: ${type}`);
-  }
-  await insertPrimitives(prims, { namePrefix: `SlideCharts ${type}` });
 }
 
 // ----------------------------------------------------------------- agenda
@@ -170,7 +249,7 @@ async function run(fn, okMessage) {
   try {
     setStatus("Working…");
     await fn();
-    setStatus(okMessage || "Done.");
+    if (okMessage) setStatus(okMessage);
   } catch (e) {
     const msg = e?.debugInfo?.message || e?.message || String(e);
     setStatus(msg, true);
@@ -182,4 +261,8 @@ function setStatus(msg, isError = false) {
   const el = $("status");
   el.textContent = msg;
   el.className = `status ${isError ? "err" : msg ? "ok" : ""}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

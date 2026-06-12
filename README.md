@@ -13,8 +13,27 @@ afterwards with normal PowerPoint tools.
 | **Waterfall** | Waterfall chart | `e` / `total` / `=` markers compute subtotal & total bars, dashed connectors at cumulative levels, red/green gain-loss coloring, baseline handles negative cumulatives |
 | **Stacked column** | Stacked chart | Segment labels (auto-hidden when too small, auto black/white for contrast), bold totals, legend |
 | **100% stacked** | 100% chart | Columns normalized to 100%, percentage labels |
+| **Clustered column** | Clustered chart | Side-by-side bars with value labels |
 | **Mekko** | Marimekko chart | Column widths proportional to column totals, share labels, totals row |
 | **Gantt** | Gantt/timeline | Numeric time units (weeks, months…), milestone diamonds for zero-duration tasks, alternating row shading |
+
+### The datasheet workflow (as in think-cell's "Get started" tutorial)
+- **Excel-style datasheet grid** in the taskpane: type or paste straight from
+  Excel; the grid grows with the used area; **year sequences in the category
+  row auto-continue** as you enter data in new columns.
+- **Live preview** above the datasheet, rendered from the exact same layout
+  primitives that get inserted on the slide.
+- **Insert once, then update in place**: after the first insert the button
+  becomes *Update chart on slide* — the previous chart's shapes are replaced,
+  mirroring think-cell's datasheet→slide sync ("Insert as new chart" is one
+  click away).
+- **Totals are computed for you** — enter only raw numbers, never totals.
+
+### Decorations
+- **Value axis with gridlines** ("nice" tick steps, left gutter)
+- **CAGR arrow** across the top, computed from first→last column totals
+- **Total difference arrow** at the right edge with percent change
+- **Number format**: auto / 0 / 1 / 2 decimals on all labels
 
 ### Agenda
 Scans your deck for slide titles, lets you edit the list, and inserts a styled
@@ -109,8 +128,9 @@ src/
 ## Known limitations
 
 - Inserted charts are plain shape collections (not grouped — Office.js does not
-  expose grouping in broadly available requirement sets), and they don't
-  re-layout when you edit the data afterwards; re-insert to update.
+  expose grouping in broadly available requirement sets). Editing the datasheet
+  and clicking *Update chart on slide* replaces the chart in place, but moving
+  individual chart shapes manually won't survive an update.
 - Harvey balls use Unicode glyphs (◔ ◑ ◕) because shape adjustment handles
   (pie angles) aren't exposed by the PowerPoint JS API.
 - The agenda slide is appended at the end of the deck; drag it into position.

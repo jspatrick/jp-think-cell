@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import {
   layoutWaterfall,
   layoutStacked,
+  layoutClustered,
   layoutMekko,
-  layoutGantt
+  layoutGantt,
+  niceTicks,
+  cagr
 } from "../src/lib/chartmath.js";
+import { primsToSvg } from "../src/lib/svgpreview.js";
 
 const FRAME = { x: 100, y: 100, w: 600, h: 300 };
 
@@ -143,4 +147,104 @@ test("gantt: bar positions follow the time scale; milestones for zero duration",
   const shadeIdx = prims.findIndex((p) => p.meta?.role === "rowShade");
   const barIdx = prims.findIndex((p) => p.meta?.role === "bar");
   assert.ok(shadeIdx < barIdx);
+});
+
+test("niceTicks: round steps covering the range, always including 0", () => {
+  const t1 = niceTicks(0, 437);
+  assert.equal(t1.step, 100);
+  assert.deepEqual(t1.ticks, [0, 100, 200, 300, 400]);
+  const t2 = niceTicks(-80, 120);
+  assert.ok(t2.ticks.includes(0));
+  assert.ok(t2.ticks[0] >= -80 && t2.ticks.at(-1) <= 120);
+});
+
+test("cagr: 100 -> 200 over 3 periods is ~26%", () => {
+  const r = cagr(100, 200, 3);
+  assert.ok(Math.abs(r - (Math.pow(2, 1 / 3) - 1)) < 1e-12);
+  assert.equal(cagr(0, 100, 3), null);
+  assert.equal(cagr(100, -5, 3), null);
+});
+
+test("stacked: CAGR arrow spans first to last column centers with rate label", () => {
+  const data = {
+    categories: ["2022", "2023", "2024", "2025"],
+    series: [{ name: "A", values: [100, 120, 150, 200] }]
+  };
+  const prims = layoutStacked(data, FRAME, { cagr: true, showLegend: false });
+  const arrow = prims.find((p) => p.kind === "arrow" && p.meta.role === "cagrArrow");
+  const label = prims.find((p) => p.meta?.role === "cagrLabel");
+  assert.ok(arrow && label);
+  close(arrow.meta.rate, Math.pow(2, 1 / 3) - 1, 1e-9);
+  assert.match(label.text, /CAGR \+26/);
+  // arrow spans from center of col 0 to center of col 3
+  const segs = rects(prims, "segment");
+  const c0 = segs[0].x + segs[0].w / 2;
+  const c3 = segs.at(-1).x + segs.at(-1).w / 2;
+  close(arrow.x, c0, 1);
+  close(arrow.x + arrow.w, c3, 1);
+});
+
+test("stacked: difference arrow compares first and last totals", () => {
+  const data = {
+    categories: ["A", "B"],
+    series: [{ name: "S", values: [100, 150] }]
+  };
+  const prims = layoutStacked(data, FRAME, { diff: true, showLegend: false });
+  const arrow = prims.find((p) => p.kind === "arrow" && p.meta.role === "diffArrow");
+  const label = prims.find((p) => p.meta?.role === "diffLabel");
+  assert.ok(arrow && label);
+  close(arrow.meta.change, 50);
+  assert.equal(label.text, "+50%");
+  // arrow sits to the right of the plot, inside the frame
+  assert.ok(arrow.x > FRAME.x + FRAME.w - 60 && arrow.x + arrow.w < FRAME.x + FRAME.w);
+});
+
+test("stacked: value axis adds gridlines at tick levels and shifts bars right", () => {
+  const data = {
+    categories: ["A", "B"],
+    series: [{ name: "S", values: [300, 437] }]
+  };
+  const plain = layoutStacked(data, FRAME, { showLegend: false });
+  const withAxis = layoutStacked(data, FRAME, { axis: true, showLegend: false });
+  const grid = withAxis.filter((p) => p.meta?.role === "gridline");
+  const tickLabels = withAxis.filter((p) => p.meta?.role === "tickLabel");
+  assert.equal(grid.length, tickLabels.length);
+  assert.deepEqual(grid.map((g) => g.meta.value), [0, 100, 200, 300, 400]);
+  // bars shift right to make room for the axis gutter
+  assert.ok(rects(withAxis, "segment")[0].x > rects(plain, "segment")[0].x);
+  // gridlines are horizontal and span the plot width
+  grid.forEach((g) => assert.equal(g.y1, g.y2));
+});
+
+test("clustered: k bars per category, heights proportional to values", () => {
+  const data = {
+    categories: ["Q1", "Q2"],
+    series: [
+      { name: "A", values: [10, 20] },
+      { name: "B", values: [30, 40] }
+    ]
+  };
+  const prims = layoutClustered(data, FRAME, { showLegend: false });
+  const bars = rects(prims, "bar");
+  assert.equal(bars.length, 4);
+  const q1 = bars.filter((b) => b.meta.category === "Q1");
+  close(q1[1].h / q1[0].h, 3);
+  // bars within a group don't overlap
+  assert.ok(q1[0].x + q1[0].w <= q1[1].x + 0.01);
+});
+
+test("svg preview renders all primitive kinds", () => {
+  const data = {
+    categories: ["2022", "2023", "2024"],
+    series: [{ name: "A", values: [100, 130, 160] }]
+  };
+  const prims = layoutStacked(data, FRAME, { cagr: true, diff: true, axis: true });
+  const svg = primsToSvg(prims);
+  assert.ok(svg.startsWith("<svg"));
+  assert.ok(svg.includes("<rect"));
+  assert.ok(svg.includes("<line"));
+  assert.ok(svg.includes("<text"));
+  assert.ok(svg.includes("<polygon")); // arrows
+  assert.ok(svg.includes("CAGR"));
+  assert.ok(!svg.includes("undefined"));
 });

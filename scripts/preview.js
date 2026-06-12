@@ -16,7 +16,8 @@ const EXAMPLES = {
   waterfall: () => layoutWaterfall(toWaterfall(parseTable(
     "Label\tValue\n2024\t820\nVolume\t95\nPrice\t40\nChurn\t-60\nFX\t-25\n2025\te")), FRAME),
   stacked: () => layoutStacked(toMatrix(parseTable(
-    "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85")), FRAME),
+    "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85")), FRAME,
+    { axis: true, cagr: true, diff: true }),
   stacked100: () => layoutStacked(toMatrix(parseTable(
     "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85")), FRAME, { percent: true }),
   mekko: () => layoutMekko(toMatrix(parseTable(
@@ -52,6 +53,17 @@ function render(prims) {
       }
     } else if (p.kind === "text" && p.text) {
       fillRect(p.x + p.w * 0.25, p.y + p.h * 0.3, p.w * 0.5, p.h * 0.4, [225, 225, 225]);
+    } else if (p.kind === "arrow") {
+      // body + solid head blocks; good enough for a geometry check
+      const c = hex(p.fill || "#404040");
+      if (p.dir === "upDown") {
+        fillRect(p.x + p.w / 3, p.y, p.w / 3, p.h, c);
+        fillRect(p.x, p.y, p.w, 6, c);
+        fillRect(p.x, p.y + p.h - 6, p.w, 6, c);
+      } else {
+        fillRect(p.x, p.y + p.h / 3, p.w - 8, p.h / 3, c);
+        fillRect(p.x + p.w - 8, p.y, 8, p.h, c);
+      }
     }
   }
   return encodePNG(W, H, px);
