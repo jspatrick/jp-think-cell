@@ -31,9 +31,21 @@ afterwards with normal PowerPoint tools.
 
 ### Decorations
 - **Value axis with gridlines** ("nice" tick steps, left gutter)
-- **CAGR arrow** across the top, computed from first→last column totals
-- **Total difference arrow** at the right edge with percent change
+- **CAGR arrow** across the top, computed from first→last column totals,
+  labelled think-cell-style in a white ellipse bubble: "+12.7% p.a."
+- **Total difference arrow** at the right edge with a "+43%" ellipse bubble
+- **Mean value line**: dashed line at the average of column totals with a
+  "Ø 150"-style label
 - **Number format**: auto / 0 / 1 / 2 decimals on all labels
+- **Color schemes**: Office palette or think-cell's classic green/gray look
+
+### Fidelity details (matched against think-cell's manual & screenshots)
+- Negative values in stacked charts stack **below the baseline**; column
+  totals are net and sit above the positive stack.
+- Waterfall value labels go **inside** the bar (auto black/white) when the
+  bar is tall enough, outside otherwise; totals stay outside and bold.
+- The datasheet supports **transpose** (swap rows/columns), like
+  think-cell's datasheet toolbar.
 
 ### Agenda
 Scans your deck for slide titles, lets you edit the list, and inserts a styled

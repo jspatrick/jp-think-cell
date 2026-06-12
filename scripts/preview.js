@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { layoutWaterfall, layoutStacked, layoutMekko, layoutGantt } from "../src/lib/chartmath.js";
 import { parseTable, toWaterfall, toMatrix, toGantt } from "../src/lib/parse.js";
+import { SCHEMES } from "../src/lib/palette.js";
 
 const OUT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "preview");
 const W = 960, H = 540;
@@ -16,8 +17,8 @@ const EXAMPLES = {
   waterfall: () => layoutWaterfall(toWaterfall(parseTable(
     "Label\tValue\n2024\t820\nVolume\t95\nPrice\t40\nChurn\t-60\nFX\t-25\n2025\te")), FRAME),
   stacked: () => layoutStacked(toMatrix(parseTable(
-    "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85")), FRAME,
-    { axis: true, cagr: true, diff: true }),
+    "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t-25\t70\t85")), FRAME,
+    { axis: true, cagr: true, diff: true, meanLine: true, palette: SCHEMES.classic }),
   stacked100: () => layoutStacked(toMatrix(parseTable(
     "\tQ1\tQ2\tQ3\tQ4\nAmericas\t120\t135\t150\t170\nEMEA\t90\t95\t100\t110\nAPAC\t45\t55\t70\t85")), FRAME, { percent: true }),
   mekko: () => layoutMekko(toMatrix(parseTable(

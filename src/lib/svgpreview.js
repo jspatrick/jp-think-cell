@@ -24,7 +24,9 @@ export function primsToSvg(prims, viewBox = { x: 0, y: 0, w: 960, h: 540 }) {
 function rect(p) {
   const stroke = p.line ? ` stroke="${p.line.color}" stroke-width="${p.line.weight ?? 1}"` : "";
   let shape;
-  if (p.shape === "diamond") {
+  if (p.shape === "ellipse") {
+    shape = `<ellipse cx="${n(p.x + p.w / 2)}" cy="${n(p.y + p.h / 2)}" rx="${n(p.w / 2)}" ry="${n(p.h / 2)}" fill="${p.fill || "none"}"${stroke}/>`;
+  } else if (p.shape === "diamond") {
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
     shape = `<polygon points="${cx},${p.y} ${p.x + p.w},${cy} ${cx},${p.y + p.h} ${p.x},${cy}" fill="${p.fill}"${stroke}/>`;
   } else {

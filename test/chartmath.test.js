@@ -175,7 +175,8 @@ test("stacked: CAGR arrow spans first to last column centers with rate label", (
   const label = prims.find((p) => p.meta?.role === "cagrLabel");
   assert.ok(arrow && label);
   close(arrow.meta.rate, Math.pow(2, 1 / 3) - 1, 1e-9);
-  assert.match(label.text, /CAGR \+26/);
+  assert.match(label.text, /^\+26% p\.a\.$/);
+  assert.equal(label.shape, "ellipse"); // think-cell-style bubble on the shaft
   // arrow spans from center of col 0 to center of col 3
   const segs = rects(prims, "segment");
   const c0 = segs[0].x + segs[0].w / 2;
@@ -245,6 +246,72 @@ test("svg preview renders all primitive kinds", () => {
   assert.ok(svg.includes("<line"));
   assert.ok(svg.includes("<text"));
   assert.ok(svg.includes("<polygon")); // arrows
-  assert.ok(svg.includes("CAGR"));
+  assert.ok(svg.includes("<ellipse")); // label bubbles
+  assert.ok(svg.includes("p.a."));
   assert.ok(!svg.includes("undefined"));
+});
+
+test("stacked: negative segments stack below the baseline; totals are net", () => {
+  const data = {
+    categories: ["2013", "2014"],
+    series: [
+      { name: "A", values: [13, 35] },
+      { name: "B", values: [5, -2] },
+      { name: "C", values: [4, 5] }
+    ]
+  };
+  const prims = layoutStacked(data, FRAME, { showLegend: false });
+  const baseline = prims.find((p) => p.meta?.role === "baseline");
+  const neg = rects(prims, "segment").find((s) => s.meta.value === -2);
+  // negative segment hangs below the baseline
+  close(neg.y, baseline.y1);
+  // net total label: 35 - 2 + 5 = 38, positioned above the positive stack
+  const totals = prims.filter((p) => p.meta?.role === "total");
+  assert.equal(totals[1].text, "38");
+  const posTop = Math.min(...rects(prims, "segment")
+    .filter((s) => s.meta.category === "2014" && s.meta.value > 0)
+    .map((s) => s.y));
+  assert.ok(totals[1].y + totals[1].h <= posTop + 0.01);
+});
+
+test("stacked: mean value line at the average of totals with Ø label", () => {
+  const data = {
+    categories: ["A", "B"],
+    series: [{ name: "S", values: [100, 200] }]
+  };
+  const prims = layoutStacked(data, FRAME, { meanLine: true, showLegend: false });
+  const line = prims.find((p) => p.meta?.role === "valueLine");
+  const label = prims.find((p) => p.meta?.role === "valueLineLabel");
+  assert.ok(line && label);
+  close(line.meta.value, 150);
+  assert.equal(label.text, "Ø 150");
+  assert.equal(line.dash, "dash");
+  // sits halfway between the two column tops
+  const segs = rects(prims, "segment");
+  close(line.y1, (segs[0].y + segs[1].y) / 2);
+});
+
+test("palette option overrides default series colors", () => {
+  const data = {
+    categories: ["A"],
+    series: [{ name: "S1", values: [10] }, { name: "S2", values: [10] }]
+  };
+  const palette = ["#77A822", "#737373"];
+  const prims = layoutStacked(data, FRAME, { palette, showLegend: false });
+  assert.deepEqual(rects(prims, "segment").map((s) => s.fill), palette);
+});
+
+test("waterfall: labels go inside tall bars, outside small ones", () => {
+  const rows = [
+    { label: "Big", value: 100 },
+    { label: "Tiny", value: 1 },
+    { label: "End", value: "e" }
+  ];
+  const prims = layoutWaterfall(rows, FRAME);
+  const bars = rects(prims, "bar");
+  assert.ok(bars[0].text === "100", "tall bar carries its label inside");
+  assert.ok(!bars[1].text, "tiny bar has no inside label");
+  assert.ok(!bars[2].text, "total bar label stays outside");
+  const outside = prims.filter((p) => p.kind === "text" && p.meta?.role === "value");
+  assert.deepEqual(outside.map((t) => t.text), ["1", "101"]);
 });

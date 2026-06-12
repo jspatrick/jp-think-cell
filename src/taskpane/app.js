@@ -7,6 +7,7 @@ import {
   layoutWaterfall, layoutStacked, layoutClustered, layoutMekko, layoutGantt
 } from "../lib/chartmath.js";
 import { primsToSvg } from "../lib/svgpreview.js";
+import { SCHEMES } from "../lib/palette.js";
 import { insertPrimitives, updateChart, newChartId } from "../office/render.js";
 import { createGrid } from "./grid.js";
 import { readSlideTitles, insertAgendaSlide } from "../office/agenda.js";
@@ -102,8 +103,18 @@ function wireCharts() {
     resetSync();
     refreshPreview();
   });
-  ["opt-labels", "opt-totals", "opt-axis", "opt-cagr", "opt-diff", "opt-decimals"]
+  ["opt-labels", "opt-totals", "opt-axis", "opt-cagr", "opt-diff", "opt-mean",
+   "opt-decimals", "opt-scheme"]
     .forEach((id) => $(id).addEventListener("change", refreshPreview));
+
+  $("btn-transpose").addEventListener("click", () => {
+    const rows = grid.getData();
+    if (!rows.length) return;
+    const cols = Math.max(...rows.map((r) => r.length));
+    grid.setData(Array.from({ length: cols }, (_, c) =>
+      Array.from({ length: rows.length }, (_, r) => rows[r][c] ?? "")));
+    setStatus("Rows and columns swapped.");
+  });
 
   $("btn-example").addEventListener("click", () => {
     grid.setData(EXAMPLES[$("chart-type").value]);
@@ -132,7 +143,9 @@ function buildPrims(frame) {
     axis: $("opt-axis").checked,
     cagr: $("opt-cagr").checked,
     diff: $("opt-diff").checked,
-    decimals: decRaw === "" ? undefined : Number(decRaw)
+    meanLine: $("opt-mean").checked,
+    decimals: decRaw === "" ? undefined : Number(decRaw),
+    palette: SCHEMES[$("opt-scheme").value] || null
   };
   if (type === "waterfall") return layoutWaterfall(toWaterfall(rows), frame, o);
   if (type === "stacked") return layoutStacked(toMatrix(rows), frame, o);

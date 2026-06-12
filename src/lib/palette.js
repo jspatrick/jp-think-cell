@@ -19,6 +19,16 @@ export const COLORS = {
   ganttMilestone: "#C00000"
 };
 
+// Selectable color schemes. "classic" mirrors think-cell's default sample
+// look: medium green, dark gray, light gray.
+export const SCHEMES = {
+  office: PALETTE,
+  classic: [
+    "#77A822", "#737373", "#C9C9C9", "#405D10",
+    "#9DC457", "#595959", "#A6A6A6", "#5B7A1E"
+  ]
+};
+
 export function seriesColor(i) {
   return PALETTE[i % PALETTE.length];
 }

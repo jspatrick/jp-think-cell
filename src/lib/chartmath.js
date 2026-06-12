@@ -39,6 +39,24 @@ export function cagr(first, last, periods) {
   return Math.pow(last / first, 1 / periods) - 1;
 }
 
+function pick(o, sr, s) {
+  if (sr.color) return sr.color;
+  if (o.palette) return o.palette[s % o.palette.length];
+  return seriesColor(s);
+}
+
+// White ellipse bubble with black outline, as think-cell draws on its CAGR
+// and difference arrows.
+function bubble(cx, cy, text, role, extra = {}) {
+  const w = Math.max(34, text.length * 5.6 + 14);
+  return {
+    kind: "rect", shape: "ellipse", x: cx - w / 2, y: cy - 9, w, h: 18,
+    fill: "#FFFFFF", line: { color: "#000000", weight: 1 },
+    text, fontSize: FONT - 1, bold: true, fontColor: "#000000",
+    meta: { role, ...extra }
+  };
+}
+
 function axisPrims(ticks, yOf, x0, x1, decimals) {
   const prims = [];
   for (const t of ticks) {
@@ -109,16 +127,25 @@ export function layoutWaterfall(rows, frame, opts = {}) {
     const yTop = yOf(Math.max(b.from, b.to));
     const h = Math.max(Math.abs(yOf(b.from) - yOf(b.to)), 1);
     const fill = b.total ? o.totalColor : b.value >= 0 ? o.posColor : o.negColor;
-    prims.push({ kind: "rect", x, y: yTop, w: barW, h, fill, meta: { role: "bar", from: b.from, to: b.to } });
+    const bar = { kind: "rect", x, y: yTop, w: barW, h, fill, meta: { role: "bar", from: b.from, to: b.to } };
 
-    if (o.showLabels) {
-      const above = b.total || b.value >= 0;
-      const ly = above ? yTop - LABEL_H : yTop + h + 2;
-      prims.push({
-        kind: "text", x: x - slot * 0.2, y: ly, w: barW + slot * 0.4, h: LABEL_H,
-        text: fmt(b.value, o.decimals), fontSize: FONT, bold: b.total, align: "center",
-        meta: { role: "value" }
-      });
+    if (o.showLabels && h >= 16 && !b.total) {
+      // think-cell puts segment labels inside the bar when they fit.
+      bar.text = fmt(b.value, o.decimals);
+      bar.fontSize = FONT;
+      bar.fontColor = contrastText(fill);
+      prims.push(bar);
+    } else {
+      prims.push(bar);
+      if (o.showLabels) {
+        const above = b.total || b.value >= 0;
+        const ly = above ? yTop - LABEL_H : yTop + h + 2;
+        prims.push({
+          kind: "text", x: x - slot * 0.2, y: ly, w: barW + slot * 0.4, h: LABEL_H,
+          text: fmt(b.value, o.decimals), fontSize: FONT, bold: b.total, align: "center",
+          meta: { role: "value" }
+        });
+      }
     }
     prims.push({
       kind: "text", x: inner.x + slot * i, y: frame.y + frame.h - LABEL_H,
@@ -150,15 +177,22 @@ export function layoutWaterfall(rows, frame, opts = {}) {
 export function layoutStacked(data, frame, opts = {}) {
   const o = {
     percent: false, gap: 0.35, showTotals: true, showLabels: true,
-    showLegend: true, axis: false, cagr: false, diff: false,
-    decimals: undefined, ...opts
+    showLegend: true, axis: false, cagr: false, diff: false, meanLine: false,
+    decimals: undefined, palette: null, ...opts
   };
   const { categories, series } = data;
   const n = categories.length;
   if (!n || !series.length) throw new Error("Stacked chart needs categories and series");
 
+  // Net totals label the columns; positive/negative sums set the scale, since
+  // negative segments stack below the baseline (as in think-cell).
   const totals = categories.map((_, c) => series.reduce((s, sr) => s + (sr.values[c] || 0), 0));
-  const vMax = o.percent ? 100 : Math.max(...totals, 1);
+  const posSums = categories.map((_, c) =>
+    series.reduce((s, sr) => s + Math.max(sr.values[c] || 0, 0), 0));
+  const negSums = categories.map((_, c) =>
+    series.reduce((s, sr) => s + Math.min(sr.values[c] || 0, 0), 0));
+  const vMax = o.percent ? 100 : Math.max(...posSums, 1);
+  const vMin = o.percent ? 0 : Math.min(...negSums, 0);
   const withCagr = o.cagr && !o.percent && n >= 2;
   const withDiff = o.diff && !o.percent && n >= 2;
 
@@ -170,34 +204,47 @@ export function layoutStacked(data, frame, opts = {}) {
   const legendH = o.showLegend ? LABEL_H + 4 : 0;
   const botPad = LABEL_H + 4 + legendH;
   const plotH = frame.h - topPad - botPad;
+  const span = vMax - vMin || 1;
+  const yOf = (v) => frame.y + topPad + ((vMax - v) * plotH) / span;
   const plotBottom = frame.y + topPad + plotH;
-  const yOf = (v) => plotBottom - (v * plotH) / vMax;
 
   const slot = inner.w / n;
   const barW = slot * (1 - o.gap);
   const prims = [];
 
   if (o.axis) {
-    const { ticks } = niceTicks(0, vMax);
+    const { ticks } = niceTicks(vMin, vMax);
     prims.push(...axisPrims(ticks, yOf, inner.x, inner.x + inner.w, o.decimals));
   }
 
   prims.push({
-    kind: "line", x1: inner.x, y1: plotBottom, x2: inner.x + inner.w, y2: plotBottom,
+    kind: "line", x1: inner.x, y1: yOf(0), x2: inner.x + inner.w, y2: yOf(0),
     color: COLORS.axis, weight: 1, meta: { role: "baseline" }
   });
 
   categories.forEach((cat, c) => {
     const x = inner.x + slot * c + (slot - barW) / 2;
-    let cursor = plotBottom;
+    let up = 0;   // cumulative positive value
+    let down = 0; // cumulative negative value
     series.forEach((sr, s) => {
       const raw = sr.values[c] || 0;
-      const val = o.percent ? (totals[c] ? (raw / totals[c]) * 100 : 0) : raw;
-      const h = (val * plotH) / vMax;
+      if (raw === 0) return;
+      const val = o.percent ? (posSums[c] ? (Math.max(raw, 0) / posSums[c]) * 100 : 0) : raw;
+      if (o.percent && val <= 0) return;
+      let y, h;
+      if (val >= 0) {
+        h = (val * plotH) / span;
+        up += val;
+        y = yOf(up);
+      } else {
+        h = (-val * plotH) / span;
+        y = yOf(down);
+        down += val;
+      }
       if (h <= 0) return;
-      const fill = sr.color || seriesColor(s);
+      const fill = pick(o, sr, s);
       const seg = {
-        kind: "rect", x, y: cursor - h, w: barW, h, fill,
+        kind: "rect", x, y, w: barW, h, fill,
         line: { color: "#FFFFFF", weight: 0.75 },
         meta: { role: "segment", series: sr.name, category: cat, value: raw }
       };
@@ -207,12 +254,11 @@ export function layoutStacked(data, frame, opts = {}) {
         seg.fontColor = contrastText(fill);
       }
       prims.push(seg);
-      cursor -= h;
     });
 
     if (o.showTotals && !o.percent) {
       prims.push({
-        kind: "text", x: inner.x + slot * c, y: cursor - LABEL_H, w: slot, h: LABEL_H,
+        kind: "text", x: inner.x + slot * c, y: yOf(posSums[c]) - LABEL_H, w: slot, h: LABEL_H,
         text: fmt(totals[c], o.decimals), fontSize: FONT, bold: true, align: "center",
         meta: { role: "total" }
       });
@@ -223,34 +269,45 @@ export function layoutStacked(data, frame, opts = {}) {
     });
   });
 
+  if (o.meanLine && !o.percent) {
+    const mean = totals.reduce((a, b) => a + b, 0) / n;
+    const y = yOf(mean);
+    prims.push({
+      kind: "line", x1: inner.x, y1: y, x2: inner.x + inner.w, y2: y,
+      color: "#404040", weight: 1, dash: "dash", meta: { role: "valueLine", value: mean }
+    });
+    prims.push({
+      kind: "text", x: inner.x + inner.w - 90, y: y - LABEL_H - 1, w: 90, h: LABEL_H,
+      text: `Ø ${fmt(mean, o.decimals)}`, fontSize: FONT - 1, align: "right",
+      meta: { role: "valueLineLabel", value: mean }
+    });
+  }
   if (withCagr) {
     prims.push(...cagrArrow(totals, n, slot, inner, frame, o.decimals));
   }
   if (withDiff) {
     prims.push(...diffArrow(totals, yOf, inner));
   }
-  if (o.showLegend) prims.push(...legendRow(series, frame, frame.y + frame.h - LABEL_H));
+  if (o.showLegend) prims.push(...legendRow(series, frame, frame.y + frame.h - LABEL_H, o));
   return prims;
 }
 
-// CAGR arrow across the top, first column center -> last column center.
+// CAGR arrow across the top, first column center -> last column center,
+// with a think-cell-style "+x.x% p.a." ellipse bubble on the shaft.
 function cagrArrow(totals, n, slot, inner, frame, decimals) {
   const rate = cagr(totals[0], totals[n - 1], n - 1);
   if (rate == null) return [];
   const x0 = inner.x + slot * 0.5;
   const x1 = inner.x + slot * (n - 0.5);
-  const y = frame.y + LABEL_H + 2;
+  const y = frame.y + LABEL_H + 4;
   const sign = rate >= 0 ? "+" : "";
+  const text = `${sign}${pct(rate * 100, decimals ?? 1)} p.a.`;
   return [
-    {
-      kind: "text", x: x0, y: frame.y, w: x1 - x0, h: LABEL_H,
-      text: `CAGR ${sign}${pct(rate * 100, decimals ?? 1)}`,
-      fontSize: FONT, bold: true, align: "center", meta: { role: "cagrLabel", rate }
-    },
     {
       kind: "arrow", dir: "right", x: x0, y, w: x1 - x0, h: 9,
       fill: "#404040", meta: { role: "cagrArrow", rate }
-    }
+    },
+    bubble((x0 + x1) / 2, y + 4.5, text, "cagrLabel", { rate })
   ];
 }
 
@@ -275,11 +332,7 @@ function diffArrow(totals, yOf, inner) {
       kind: "arrow", dir: "upDown", x, y: top, w: 9, h,
       fill: "#404040", meta: { role: "diffArrow", change }
     },
-    {
-      kind: "text", x: x + 12, y: top + h / 2 - LABEL_H / 2, w: DIFF_W - 24, h: LABEL_H,
-      text: `${sign}${pct(change)}`, fontSize: FONT, bold: true, align: "left",
-      meta: { role: "diffLabel", change }
-    }
+    bubble(x + 4.5, top + h / 2, `${sign}${pct(change)}`, "diffLabel", { change })
   ];
 }
 
@@ -288,7 +341,7 @@ function diffArrow(totals, yOf, inner) {
 export function layoutClustered(data, frame, opts = {}) {
   const o = {
     gap: 0.3, showLabels: true, showLegend: true, axis: false,
-    decimals: undefined, ...opts
+    decimals: undefined, palette: null, ...opts
   };
   const { categories, series } = data;
   const n = categories.length;
@@ -329,7 +382,7 @@ export function layoutClustered(data, frame, opts = {}) {
       if (h > 0) {
         prims.push({
           kind: "rect", x, y: plotBottom - h, w: barW - 1, h,
-          fill: sr.color || seriesColor(s),
+          fill: pick(o, sr, s),
           meta: { role: "bar", series: sr.name, category: cat, value: raw }
         });
       }
@@ -347,7 +400,7 @@ export function layoutClustered(data, frame, opts = {}) {
     });
   });
 
-  if (o.showLegend) prims.push(...legendRow(series, frame, frame.y + frame.h - LABEL_H));
+  if (o.showLegend) prims.push(...legendRow(series, frame, frame.y + frame.h - LABEL_H, o));
   return prims;
 }
 
@@ -356,7 +409,7 @@ export function layoutClustered(data, frame, opts = {}) {
 export function layoutMekko(data, frame, opts = {}) {
   const o = {
     colGap: 2, showLabels: true, showTotals: true, showLegend: true,
-    decimals: undefined, ...opts
+    decimals: undefined, palette: null, ...opts
   };
   const { categories, series } = data;
   const n = categories.length;
@@ -383,7 +436,7 @@ export function layoutMekko(data, frame, opts = {}) {
       const share = totals[c] ? raw / totals[c] : 0;
       const h = share * plotH;
       if (h <= 0) return;
-      const fill = sr.color || seriesColor(s);
+      const fill = pick(o, sr, s);
       const seg = {
         kind: "rect", x, y: cursor - h, w: colW, h, fill,
         line: { color: "#FFFFFF", weight: 0.75 },
@@ -412,7 +465,7 @@ export function layoutMekko(data, frame, opts = {}) {
     x += colW + o.colGap;
   });
 
-  if (o.showLegend) prims.push(...legendRow(series, frame, frame.y + frame.h - LABEL_H));
+  if (o.showLegend) prims.push(...legendRow(series, frame, frame.y + frame.h - LABEL_H, o));
   return prims;
 }
 
@@ -493,7 +546,7 @@ function z(p) {
 
 // ------------------------------------------------------------------ legend
 
-function legendRow(series, frame, y) {
+function legendRow(series, frame, y, o = {}) {
   const prims = [];
   const itemW = Math.min(frame.w / series.length, 120);
   const totalW = itemW * series.length;
@@ -501,7 +554,7 @@ function legendRow(series, frame, y) {
   series.forEach((sr, s) => {
     prims.push({
       kind: "rect", x, y: y + 3, w: 8, h: 8,
-      fill: sr.color || seriesColor(s), meta: { role: "legendSwatch" }
+      fill: pick(o, sr, s), meta: { role: "legendSwatch" }
     });
     prims.push({
       kind: "text", x: x + 11, y, w: itemW - 14, h: LABEL_H,

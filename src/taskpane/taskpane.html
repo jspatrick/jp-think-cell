@@ -42,6 +42,7 @@
 
     <div class="row">
       <button id="btn-example" class="secondary">Load example</button>
+      <button id="btn-transpose" class="secondary" title="Swap rows and columns">⇄ Transpose</button>
       <button id="btn-clear" class="secondary">Clear</button>
     </div>
 
@@ -53,12 +54,21 @@
     <div class="row">
       <label class="check"><input type="checkbox" id="opt-cagr" /> CAGR arrow</label>
       <label class="check"><input type="checkbox" id="opt-diff" /> Difference arrow</label>
+      <label class="check"><input type="checkbox" id="opt-mean" /> Mean line</label>
+    </div>
+    <div class="row">
       <label class="check">Decimals
         <select id="opt-decimals" class="inline-select">
           <option value="">Auto</option>
           <option value="0">0</option>
           <option value="1">1</option>
           <option value="2">2</option>
+        </select>
+      </label>
+      <label class="check">Colors
+        <select id="opt-scheme" class="inline-select">
+          <option value="office">Office</option>
+          <option value="classic">think-cell classic</option>
         </select>
       </label>
     </div>
